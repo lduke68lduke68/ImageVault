@@ -38,8 +38,19 @@
       }
       .top{
         display:flex;
+        gap:10px;
         justify-content:flex-end;
+        align-items:center;
         margin-bottom:18px
+      }
+      .mode-link{
+        border:1px solid #555;
+        background:#1a1a1a;
+        color:#eee;
+        border-radius:8px;
+        padding:10px 14px;
+        font-size:15px;
+        text-decoration:none
       }
       .tabs{
         display:flex;
@@ -121,6 +132,9 @@
     </form>
     <main class="app" id="app">
       <div class="top">
+        <a class="mode-link" href="anyfile.html">
+          Any File Mode
+        </a>
         <button id="lock" type="button">
           Lock
         </button>

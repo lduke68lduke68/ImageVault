@@ -1,0 +1,286 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>
+    </title>
+    <style>
+      html,body{
+        margin:0;
+        background:#111;
+        color:#eee;
+        font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif
+      }
+      body{
+        min-height:100vh;
+        display:grid;
+        place-items:center
+      }
+      .gate{
+        width:min(72vw,360px)
+      }
+      .gate input{
+        box-sizing:border-box;
+        width:100%;
+        font-size:22px;
+        padding:14px 16px;
+        border:1px solid #555;
+        border-radius:10px;
+        background:#181818;
+        color:#eee;
+        outline:none
+      }
+      .app{
+        display:none;
+        width:min(92vw,760px);
+        padding:28px
+      }
+      .top{
+        display:flex;
+        gap:10px;
+        justify-content:flex-end;
+        align-items:center;
+        margin-bottom:18px
+      }
+      .mode-link{
+        border:1px solid #555;
+        background:#1a1a1a;
+        color:#eee;
+        border-radius:8px;
+        padding:10px 14px;
+        font-size:15px;
+        text-decoration:none
+      }
+      .tabs{
+        display:flex;
+        gap:8px;
+        margin-bottom:18px
+      }
+      .tabs button,.top button,.actions button{
+        border:1px solid #555;
+        background:#1a1a1a;
+        color:#eee;
+        border-radius:8px;
+        padding:10px 14px;
+        font-size:15px
+      }
+      .tabs button.active{
+        background:#2c2c2c
+      }
+      .panel{
+        display:none
+      }
+      .panel.active{
+        display:block
+      }
+      .field{
+        margin:14px 0
+      }
+      .field label{
+        display:block;
+        font-size:14px;
+        margin-bottom:7px;
+        color:#bbb
+      }
+      .field input[type=file]{
+        width:100%;
+        box-sizing:border-box;
+        border:1px solid #444;
+        border-radius:8px;
+        padding:12px;
+        background:#171717;
+        color:#ddd
+      }
+      .actions{
+        display:flex;
+        gap:10px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin-top:18px
+      }
+      .status{
+        font-size:14px;
+        color:#bbb;
+        min-height:1.3em
+      }
+      .capacity{
+        font-size:13px;
+        color:#999;
+        margin-top:8px
+      }
+      .capacity.over{
+        color:#ff9b9b
+      }
+      .hidden{
+        display:none!important
+      }
+      @media(max-width:520px){
+        .app{
+          padding:18px
+        }
+        .tabs{
+          display:grid;
+          grid-template-columns:1fr 1fr
+        }
+        .tabs button{
+          width:100%
+        }
+        .top{
+          justify-content:stretch
+        }
+        .mode-link,.top button{
+          flex:1;
+          text-align:center
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <form class="gate" id="gate">
+      <input id="pw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" aria-label="Password">
+    </form>
+    <main class="app" id="app">
+      <div class="top">
+        <a class="mode-link" href="index.html">
+          Text Mode
+        </a>
+        <button id="lock" type="button">
+          Lock
+        </button>
+      </div>
+      <div class="tabs">
+        <button id="createTab" class="active" type="button">
+          Create
+        </button>
+        <button id="openTab" type="button">
+          Open
+        </button>
+      </div>
+      <section id="createPanel" class="panel active">
+        <div class="field">
+          <label for="imgIn">
+            PNG image
+          </label>
+          <input id="imgIn" type="file" accept="image/png,.png">
+        </div>
+        <div class="field">
+          <label for="fileIn">
+            File
+          </label>
+          <input id="fileIn" type="file">
+        </div>
+        <div id="capacity" class="capacity">
+        </div>
+        <div class="actions">
+          <button id="createBtn" type="button">
+            Create PNG
+          </button>
+          <span id="createStatus" class="status" aria-live="polite">
+          </span>
+        </div>
+      </section>
+      <section id="openPanel" class="panel">
+        <div class="field">
+          <label for="vaultIn">
+            PNG image
+          </label>
+          <input id="vaultIn" type="file" accept="image/png,.png">
+        </div>
+        <div class="actions">
+          <button id="openBtn" type="button">
+            Decrypt File
+          </button>
+          <span id="openStatus" class="status" aria-live="polite">
+          </span>
+        </div>
+      </section>
+      <canvas id="canvas" class="hidden">
+      </canvas>
+    </main>
+    <script>
+      (()=>{
+        const MAGIC=new Uint8Array([0x91,0x37,0xA6,0x4C,0x52,0xE1,0x09,0x7B]),VER=1,ITER=250000,HEAD=41,$=s=>document.querySelector(s),gate=$('#gate'),app=$('#app'),pw=$('#pw'),lock=$('#lock'),createTab=$('#createTab'),openTab=$('#openTab'),createPanel=$('#createPanel'),openPanel=$('#openPanel'),imgIn=$('#imgIn'),fileIn=$('#fileIn'),vaultIn=$('#vaultIn'),capacity=$('#capacity'),createStatus=$('#createStatus'),openStatus=$('#openStatus'),canvas=$('#canvas'),createBtn=$('#createBtn'),openBtn=$('#openBtn');
+        let secret='';
+        const te=new TextEncoder(),td=new TextDecoder();
+        function wipe(){secret='';pw.value='';imgIn.value='';fileIn.value='';vaultIn.value='';capacity.textContent='';capacity.classList.remove('over');createStatus.textContent='';openStatus.textContent='';app.style.display='none';gate.style.display='block';setTimeout(()=>pw.focus(),0)}
+        function unlock(){if(!pw.value)return;secret=pw.value;pw.value='';gate.style.display='none';app.style.display='block'}
+        gate.addEventListener('submit',e=>{e.preventDefault();unlock()});
+        pw.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();unlock()}});
+        lock.addEventListener('click',wipe);
+        function tab(which){const c=which==='c';createTab.classList.toggle('active',c);openTab.classList.toggle('active',!c);createPanel.classList.toggle('active',c);openPanel.classList.toggle('active',!c)}
+        createTab.addEventListener('click',()=>tab('c'));
+        openTab.addEventListener('click',()=>tab('o'));
+        function u32(n){const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,false);return a}
+        function u16(n){const a=new Uint8Array(2);new DataView(a.buffer).setUint16(0,n,false);return a}
+        function cat(...arrs){let n=arrs.reduce((s,a)=>s+a.length,0),o=new Uint8Array(n),p=0;for(const a of arrs){o.set(a,p);p+=a.length}return o}
+        function fmt(n){if(n<1024)return `${n} B`;if(n<1048576)return `${(n/1024).toFixed(1)} KB`;return `${(n/1048576).toFixed(2)} MB`}
+        async function keyFor(password,salt,usage){const base=await crypto.subtle.importKey('raw',te.encode(password),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:ITER,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,[usage])}
+        function loadPng(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),im=new Image();im.onload=()=>{URL.revokeObjectURL(url);res(im)};im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Invalid PNG'))};im.src=url})}
+        function embed(data,payload){let bit=0;for(let i=0;i<data.length&&bit<payload.length*8;i+=4){for(let c=0;c<3&&bit<payload.length*8;c++){const b=(payload[bit>>3]>>(7-(bit&7)))&1;data[i+c]=(data[i+c]&254)|b;bit++}}if(bit<payload.length*8)throw new Error('Payload too large')}
+        function extract(data,nbytes,offsetBits=0){const out=new Uint8Array(nbytes);let bit=0,seen=0;for(let i=0;i<data.length&&bit<nbytes*8;i+=4){for(let c=0;c<3&&bit<nbytes*8;c++){if(seen++<offsetBits)continue;out[bit>>3]|=(data[i+c]&1)<<(7-(bit&7));bit++}}if(bit<nbytes*8)throw new Error('Insufficient image data');return out}
+        async function imageDataFrom(file){const im=await loadPng(file);canvas.width=im.naturalWidth;canvas.height=im.naturalHeight;const x=canvas.getContext('2d',{willReadFrequently:true});x.clearRect(0,0,canvas.width,canvas.height);x.drawImage(im,0,0);return {x,d:x.getImageData(0,0,canvas.width,canvas.height),w:canvas.width,h:canvas.height}}
+        function download(blob,name){const a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+        function estimatePayloadBytes(file){return HEAD+16+2+te.encode(file.name).length+file.size}
+        async function showCap(){capacity.textContent='';capacity.classList.remove('over');const f=imgIn.files[0],payload=fileIn.files[0];if(!f&&!payload)return;if(payload&&!f){capacity.textContent=`Selected file: ${fmt(payload.size)}`;return}try{const im=await loadPng(f),cap=Math.floor(im.naturalWidth*im.naturalHeight*3/8);if(!payload){capacity.textContent=`Carrier capacity: ${fmt(cap)}`;return}const need=estimatePayloadBytes(payload),over=need>cap;capacity.classList.toggle('over',over);capacity.textContent=`Carrier capacity: ${fmt(cap)} • Selected file: ${fmt(payload.size)} • Required: ${fmt(need)}${over?' • Too large':''}`}catch{capacity.textContent='Invalid PNG.'}}
+        imgIn.addEventListener('change',showCap);
+        fileIn.addEventListener('change',showCap);
+        createBtn.addEventListener('click',async()=>{
+          createStatus.textContent='';
+          try{
+            if(!secret)throw new Error('Locked');
+            const pf=imgIn.files[0],payloadFile=fileIn.files[0];
+            if(!pf||!payloadFile)throw new Error('Select a PNG and file.');
+            if(!/\.png$/i.test(pf.name)||!pf.type.includes('png'))throw new Error('PNG required.');
+            const im=await loadPng(pf),cap=Math.floor(im.naturalWidth*im.naturalHeight*3/8),need=estimatePayloadBytes(payloadFile);
+            if(need>cap)throw new Error(`File is too large for this image (${need} bytes needed, ${cap} available).`);
+            createStatus.textContent='Working...';
+            const raw=new Uint8Array(await payloadFile.arrayBuffer()),name=te.encode(payloadFile.name);
+            if(name.length>65535)throw new Error('Filename too long.');
+            const plain=cat(u16(name.length),name,raw),salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await keyFor(secret,salt,'encrypt'),cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,plain)),payload=cat(MAGIC,new Uint8Array([VER]),salt,iv,u32(cipher.length),cipher),obj=await imageDataFrom(pf);
+            if(payload.length>cap)throw new Error(`File is too large for this image (${payload.length} bytes needed, ${cap} available).`);
+            embed(obj.d.data,payload);
+            obj.x.putImageData(obj.d,0,0);
+            const blob=await new Promise((r,j)=>canvas.toBlob(b=>b?r(b):j(new Error('PNG creation failed')),'image/png'));
+            const base=pf.name.replace(/\.png$/i,'');
+            download(blob,base+'.png');
+            createStatus.textContent='PNG created.';
+          }catch(e){
+            createStatus.textContent=e.message||'Invalid file or key.';
+          }
+        });
+        openBtn.addEventListener('click',async()=>{
+          openStatus.textContent='';
+          try{
+            if(!secret)throw new Error('Locked');
+            const f=vaultIn.files[0];
+            if(!f)throw new Error('Select a PNG file.');
+            openStatus.textContent='Working...';
+            const obj=await imageDataFrom(f),h=extract(obj.d.data,HEAD);
+            for(let i=0;i<MAGIC.length;i++)if(h[i]!==MAGIC[i])throw new Error('Invalid file or key.');
+            if(h[8]!==VER)throw new Error('Unsupported file.');
+            const salt=h.slice(9,25),iv=h.slice(25,37),len=new DataView(h.buffer,h.byteOffset+37,4).getUint32(0,false),cap=Math.floor(obj.w*obj.h*3/8);
+            if(len<16||HEAD+len>cap)throw new Error('Invalid file or key.');
+            const all=extract(obj.d.data,HEAD+len),cipher=all.slice(HEAD),key=await keyFor(secret,salt,'decrypt');
+            let plain;
+            try{
+              plain=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv},key,cipher));
+            }catch{
+              throw new Error('Invalid file or key.');
+            }
+            if(plain.length<2)throw new Error('Invalid file or key.');
+            const nl=new DataView(plain.buffer,plain.byteOffset,2).getUint16(0,false);
+            if(2+nl>plain.length)throw new Error('Invalid file or key.');
+            const name=td.decode(plain.slice(2,2+nl))||'imagevault-file';
+            const raw=plain.slice(2+nl);
+            download(new Blob([raw]),name);
+            openStatus.textContent='File created.';
+          }catch(e){
+            openStatus.textContent=e.message||'Invalid file or key.';
+          }
+        });
+        pw.focus();
+      })();
+    </script>
+  </body>
+</html>
